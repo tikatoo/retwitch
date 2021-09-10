@@ -64,13 +64,13 @@ func ircToLiveEvent(ircEvent girc.Event) (event LiveEvent) {
 
 func ircToSender(ircEvent girc.Event) (sender Viewer) {
 	sender = Viewer{
-		User:    ircEvent.Source.Name,
-		Display: ircEvent.Source.Name,
-		Color:   "",
+		User: ircEvent.Source.Name,
 	}
 
 	if display, ok := ircEvent.Tags.Get("display-name"); ok {
-		sender.Display = display
+		if display != sender.User {
+			sender.Display = display
+		}
 	}
 
 	if color, ok := ircEvent.Tags.Get("color"); ok {

@@ -1,6 +1,8 @@
 package retwitch
 
 import (
+	"encoding/json"
+	"errors"
 	"strconv"
 	"strings"
 	"time"
@@ -14,17 +16,17 @@ const (
 )
 
 type Viewer struct {
-	User    string
-	Display string
-	Color   string
+	User    string `json:"user"`
+	Display string `json:"display,omitempty"`
+	Color   string `json:"color,omitempty"`
 }
 
 type LiveEvent struct {
-	Time    time.Time
-	Channel string
-	Sender  Viewer
-	Kind    LiveEventKind
-	Message string
+	Time    time.Time     `json:"time"`
+	Channel string        `json:"channel"`
+	Sender  Viewer        `json:"sender"`
+	Kind    LiveEventKind `json:"kind"`
+	Message string        `json:"message"`
 }
 
 func (v *Viewer) String() string {
@@ -67,3 +69,38 @@ func (e *LiveEvent) String() string {
 
 	return b.String()
 }
+
+func (k LiveEventKind) MarshalJSON() (result []byte, err error) {
+	var word string
+
+	switch k {
+	case MessageEvent:
+		word = "message"
+	case ActionEvent:
+		word = "action"
+	default:
+		return nil, errEventKind
+	}
+
+	return json.Marshal(word)
+}
+
+func (k *LiveEventKind) UnmarshalJSON(data []byte) (err error) {
+	var word string
+	if err = json.Unmarshal(data, &word); err != nil {
+		return
+	}
+
+	switch word {
+	case "message":
+		*k = MessageEvent
+	case "action":
+		*k = ActionEvent
+	default:
+		err = errEventKind
+	}
+
+	return
+}
+
+var errEventKind = errors.New("invalid event kind")
