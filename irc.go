@@ -46,24 +46,35 @@ func ircConnect(username string, authcode string) (*girc.Client, error) {
 	return irc, nil
 }
 
-func ircToLiveEvent(ircEvent girc.Event) LiveEvent {
-	return LiveEvent{
+func ircToLiveEvent(ircEvent girc.Event) (event LiveEvent) {
+	event = LiveEvent{
 		Time:    ircEvent.Timestamp,
 		Channel: ircEvent.Params[0][1:],
 		Sender:  ircToSender(ircEvent),
+		Kind:    MessageEvent,
 		Message: ircToMessage(ircEvent),
 	}
+
+	if ircEvent.IsAction() {
+		event.Kind = ActionEvent
+	}
+
+	return
 }
 
 func ircToSender(ircEvent girc.Event) (sender Viewer) {
 	sender = Viewer{
-		User: ircEvent.Source.Name,
+		User:    ircEvent.Source.Name,
+		Display: ircEvent.Source.Name,
+		Color:   "",
 	}
 
 	if display, ok := ircEvent.Tags.Get("display-name"); ok {
 		sender.Display = display
-	} else {
-		sender.Display = sender.User
+	}
+
+	if color, ok := ircEvent.Tags.Get("color"); ok {
+		sender.Color = color
 	}
 
 	return
