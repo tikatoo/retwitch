@@ -26,7 +26,7 @@ type LiveEvent struct {
 	Channel string        `json:"channel"`
 	Sender  Viewer        `json:"sender"`
 	Kind    LiveEventKind `json:"kind"`
-	Message string        `json:"message"`
+	Message Text          `json:"message"`
 }
 
 func (v *Viewer) String() string {
@@ -41,8 +41,9 @@ func (v *Viewer) String() string {
 
 func (e *LiveEvent) String() string {
 	sender := e.Sender.String()
+	message := e.Message.String()
 	b := &strings.Builder{}
-	b.Grow(16 + len(e.Channel) + len(sender) + len(e.Message))
+	b.Grow(16 + len(e.Channel) + len(sender) + len(message))
 	b.WriteString("[")
 	b.WriteString(e.Time.Format("03:04"))
 	b.WriteString(" in ")
@@ -53,12 +54,12 @@ func (e *LiveEvent) String() string {
 	case MessageEvent:
 		b.WriteString(sender)
 		b.WriteString(": ")
-		b.WriteString(e.Message)
+		b.WriteString(message)
 	case ActionEvent:
 		b.WriteString("* ")
 		b.WriteString(sender)
 		b.WriteString(" ")
-		b.WriteString(e.Message)
+		b.WriteString(message)
 	default:
 		b.WriteString("<unknown event ")
 		b.WriteString(strconv.Itoa(int(e.Kind)))

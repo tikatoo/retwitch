@@ -80,10 +80,17 @@ func ircToSender(ircEvent girc.Event) (sender Viewer) {
 	return
 }
 
-func ircToMessage(ircEvent girc.Event) (msg string) {
-	msg = ircEvent.Last()
+func ircToMessage(ircEvent girc.Event) (message Text) {
+	msg := ircEvent.Last()
 	if ok, ctcp := ircEvent.IsCTCP(); ok {
 		msg = ctcp.Text
+	}
+
+	var err error
+	emotespec, _ := ircEvent.Tags.Get("emotes")
+	message, err = parseIRCText(msg, emotespec)
+	if err != nil {
+		message = Text{{Text: msg}}
 	}
 
 	return
