@@ -3,6 +3,7 @@ package retwitch
 import (
 	"math/rand"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/lrstanley/girc"
@@ -75,6 +76,10 @@ func ircToSender(ircEvent girc.Event) (sender Viewer) {
 
 	if color, ok := ircEvent.Tags.Get("color"); ok {
 		sender.Color = color
+	}
+
+	if badgespec, ok := ircEvent.Tags.Get("badges"); ok {
+		sender.Badges = strings.Split(badgespec, ",")
 	}
 
 	return

@@ -16,9 +16,10 @@ const (
 )
 
 type Viewer struct {
-	User    string `json:"user"`
-	Display string `json:"display,omitempty"`
-	Color   string `json:"color,omitempty"`
+	User    string   `json:"user"`
+	Display string   `json:"display,omitempty"`
+	Color   string   `json:"color,omitempty"`
+	Badges  []string `json:"badges,omitempty"`
 }
 
 type LiveEvent struct {
@@ -30,13 +31,24 @@ type LiveEvent struct {
 }
 
 func (v *Viewer) String() string {
-	if v.Display == "" {
-		return v.User + v.Color
-	} else if v.User == strings.ToLower(v.Display) {
-		return v.Display + v.Color
+	prefix := ""
+	if len(v.Badges) > 0 {
+		fmtbadges := make([]string, len(v.Badges))
+		copy(fmtbadges, v.Badges)
+		for i, badge := range fmtbadges {
+			fmtbadges[i] = strings.TrimSuffix(badge, "/1")
+		}
+
+		prefix = "<" + strings.Join(fmtbadges, ", ") + "> "
 	}
 
-	return v.Display + v.Color + "@" + v.User
+	if v.Display == "" {
+		return prefix + v.User + v.Color
+	} else if v.User == strings.ToLower(v.Display) {
+		return prefix + v.Display + v.Color
+	}
+
+	return prefix + v.Display + v.Color + "@" + v.User
 }
 
 func (e *LiveEvent) String() string {
