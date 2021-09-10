@@ -57,7 +57,7 @@ func (e *LiveEvent) String() string {
 	b := &strings.Builder{}
 	b.Grow(16 + len(e.Channel) + len(sender) + len(message))
 	b.WriteString("[")
-	b.WriteString(e.Time.Format("03:04"))
+	b.WriteString(e.Time.Format("15:04"))
 	b.WriteString(" in ")
 	b.WriteString(e.Channel)
 	b.WriteString("] ")

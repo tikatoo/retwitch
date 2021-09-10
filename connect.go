@@ -17,6 +17,8 @@ func NewClient(config ClientConfig) (c *Client, err error) {
 	c.levs = make(chan LiveEvent, 24)
 	c.irc.Handlers.Add(girc.PRIVMSG, c.onPrivmsg)
 
+	c.channels = map[string]*ChannelInfo{}
+
 	return
 }
 

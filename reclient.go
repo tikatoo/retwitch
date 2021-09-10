@@ -5,8 +5,29 @@ import (
 )
 
 type Client struct {
-	irc  *girc.Client
-	levs chan LiveEvent
+	appAuth  *twitchauth
+	helix    *HelixAPI
+	irc      *girc.Client
+	levs     chan LiveEvent
+	channels map[string]*ChannelInfo
+	badges   map[string]HelixChatBadge
+}
+
+func (c *Client) Helix() (*HelixAPI, error) {
+	var err error
+
+	if c.appAuth == nil {
+		c.appAuth, err = getDefaultAuth()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if c.helix == nil {
+		c.helix = getHelixAPI(c.appAuth)
+	}
+
+	return c.helix, nil
 }
 
 func (c *Client) Join(channel string) (err error) {
@@ -28,6 +49,7 @@ func (c *Client) Join(channel string) (err error) {
 	c.irc.Cmd.Join(channel)
 	result := <-evch
 	if result.Command == girc.JOIN {
+		// c.getChannelInfo(channel)
 		return nil
 	}
 
