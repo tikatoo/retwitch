@@ -14,6 +14,8 @@ type TextSegment struct {
 	Text      string
 	EmoteID   string
 	EmoteText string
+	Bits      int
+	BitsColor string
 }
 
 func (t Text) String() string {
@@ -29,6 +31,13 @@ func (t Text) String() string {
 				b.WriteString(":")
 			}
 			b.WriteString(segment.EmoteID)
+			if segment.Bits != 0 {
+				b.WriteString("*")
+				b.WriteString(strconv.Itoa(segment.Bits))
+			}
+			if segment.BitsColor != "" {
+				b.WriteString(segment.BitsColor)
+			}
 			b.WriteString(">")
 		}
 	}
@@ -55,11 +64,15 @@ func (t Text) MarshalJSON() ([]byte, error) {
 			type emoteSegment struct {
 				EmoteID   string `json:"emote"`
 				EmoteText string `json:"name,omitempty"`
+				Bits      int    `json:"bits,omitempty"`
+				BitsColor string `json:"bits_color,omitempty"`
 			}
 
 			enc, err := json.Marshal(emoteSegment{
 				EmoteID:   segment.EmoteID,
 				EmoteText: segment.EmoteText,
+				Bits:      segment.Bits,
+				BitsColor: segment.BitsColor,
 			})
 			if err != nil {
 				return nil, err
@@ -81,43 +94,49 @@ func (t Text) MarshalJSON() ([]byte, error) {
 
 type emoteLocation struct {
 	EmoteID    string
-	CheerValue uint
+	CheerValue int
+	CheerColor string
 	StartAt    int
 	EndAt      int
 }
 
-func parseIRCText(msgtext string, emotespec string) (Text, error) {
-	if emotespec == "" {
-		return Text{{Text: msgtext}}, nil
+func (c *ChannelInfo) parseIRCText(msgtext string, emotespec string) (Text, error) {
+	var emotelist []emoteLocation
+	if emotespec != "" {
+		speclist := strings.Split(emotespec, "/")
+		emotelist = make([]emoteLocation, 0,
+			strings.Count(emotespec, "/")+strings.Count(emotespec, ","))
+
+		for _, specentry := range speclist {
+			splitspec := strings.Split(specentry, ":")
+			emoteid := splitspec[0]
+
+			splitspec = strings.Split(splitspec[1], ",")
+			for _, specentry := range splitspec {
+				offsets := strings.Split(specentry, "-")
+				startat, err := strconv.ParseInt(offsets[0], 10, 32)
+				if err != nil {
+					return nil, err
+				}
+
+				endat, err := strconv.ParseInt(offsets[1], 10, 32)
+				if err != nil {
+					return nil, err
+				}
+
+				emotelist = append(emotelist, emoteLocation{
+					EmoteID: emoteid,
+					StartAt: int(startat),
+					EndAt:   int(endat),
+				})
+			}
+		}
 	}
 
-	speclist := strings.Split(emotespec, "/")
-	emotelist := make([]emoteLocation, 0,
-		strings.Count(emotespec, "/")+strings.Count(emotespec, ","))
+	emotelist = append(emotelist, c.parseIRCCheer(msgtext)...)
 
-	for _, specentry := range speclist {
-		splitspec := strings.Split(specentry, ":")
-		emoteid := splitspec[0]
-
-		splitspec = strings.Split(splitspec[1], ",")
-		for _, specentry := range splitspec {
-			offsets := strings.Split(specentry, "-")
-			startat, err := strconv.ParseInt(offsets[0], 10, 32)
-			if err != nil {
-				return nil, err
-			}
-
-			endat, err := strconv.ParseInt(offsets[1], 10, 32)
-			if err != nil {
-				return nil, err
-			}
-
-			emotelist = append(emotelist, emoteLocation{
-				EmoteID: emoteid,
-				StartAt: int(startat),
-				EndAt:   int(endat),
-			})
-		}
+	if len(emotelist) == 0 {
+		return Text{{Text: msgtext}}, nil
 	}
 
 	sort.Slice(emotelist, func(i int, j int) bool {
@@ -136,6 +155,11 @@ func parseIRCText(msgtext string, emotespec string) (Text, error) {
 		off = entry.EndAt + 1
 		segment.EmoteID = entry.EmoteID
 		segment.EmoteText = msgtext[entry.StartAt:off]
+
+		if entry.CheerValue != 0 {
+			segment.Bits = entry.CheerValue
+			segment.BitsColor = entry.CheerColor
+		}
 	}
 
 	if off < len(msgtext) {
@@ -143,4 +167,46 @@ func parseIRCText(msgtext string, emotespec string) (Text, error) {
 	}
 
 	return Text(segments), nil
+}
+
+func (c *ChannelInfo) parseIRCCheer(msgtext string) (locs []emoteLocation) {
+	if c == nil {
+		return
+	}
+
+	if err := c.resolveCheermotes(); err != nil {
+		return
+	}
+
+	m := c.cheerMatch.FindAllStringSubmatchIndex(msgtext, -1)
+	locs = make([]emoteLocation, 0, len(m))
+
+	for _, match := range m {
+		cmPrefix := msgtext[match[2]:match[3]]
+		cmValueString := msgtext[match[4]:match[5]]
+		cmValue, err := strconv.Atoi(cmValueString)
+		if err != nil {
+			continue
+		}
+
+		cheerInfo := c.cheerInfo[cmPrefix+"1"]
+		for cheerInfo.NextTierID != "" {
+			nextCheerInfo := c.cheerInfo[cheerInfo.NextTierID]
+			if cmValue < nextCheerInfo.CheerValue {
+				break
+			}
+
+			cheerInfo = nextCheerInfo
+		}
+
+		locs = append(locs, emoteLocation{
+			EmoteID:    cheerInfo.CheerID,
+			CheerValue: cmValue,
+			CheerColor: cheerInfo.CheerColor,
+			StartAt:    match[2],
+			EndAt:      match[5] - 1,
+		})
+	}
+
+	return
 }

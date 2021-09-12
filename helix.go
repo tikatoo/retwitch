@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 )
 
@@ -12,6 +13,15 @@ type HelixAPI struct {
 	http.Client
 
 	useridCache map[string]string
+}
+
+type HelixCheermote struct {
+	CheerID     string
+	CheerPrefix string
+	CheerValue  int
+	CheerColor  string
+	NextTierID  string
+	ImageURL    string
 }
 
 type HelixChatBadge struct {
@@ -29,7 +39,7 @@ func (h *HelixAPI) GetUserID(login string) (id string, err error) {
 	q := url.Values{"login": {login}}
 	url := "https://api.twitch.tv/helix/users?" + q.Encode()
 
-	resp, err := h.Get(url)
+	resp, err := h.getEnsureOK(url)
 	if err != nil {
 		return
 	}
@@ -56,8 +66,78 @@ func (h *HelixAPI) GetUserID(login string) (id string, err error) {
 	return
 }
 
+func (h *HelixAPI) GetCheermotes(bcid string) (cheermotePrefixes []string, cheermoteInfo map[string]HelixCheermote, err error) {
+	query := ""
+	if bcid != "" {
+		query = "?broadcaster_id=" + bcid
+	}
+
+	resp, err := h.getEnsureOK("https://api.twitch.tv/helix/bits/cheermotes" + query)
+	if err != nil {
+		return
+	}
+
+	defer resp.Body.Close()
+
+	type ResponseTier struct {
+		MinBits int                                     `json:"min_bits"`
+		Color   string                                  `json:"color"`
+		Images  map[string]map[string]map[string]string `json:"images"`
+	}
+	type ResponseCheermote struct {
+		Prefix string         `json:"prefix"`
+		Tiers  []ResponseTier `json:"tiers"`
+	}
+	type ResponseContainer struct {
+		Data []ResponseCheermote `json:"data"`
+	}
+
+	var body ResponseContainer
+	dec := json.NewDecoder(resp.Body)
+	err = dec.Decode(&body)
+	if err != nil {
+		return
+	}
+
+	cheermotePrefixes = make([]string, 0, len(body.Data))
+	cheermoteInfo = map[string]HelixCheermote{}
+	for _, mote := range body.Data {
+		var lastTier HelixCheermote
+		cheermotePrefixes = append(cheermotePrefixes, mote.Prefix)
+		for _, tier := range mote.Tiers {
+			currentTier := HelixCheermote{
+				CheerID:     mote.Prefix + strconv.Itoa(tier.MinBits),
+				CheerPrefix: mote.Prefix,
+				CheerValue:  tier.MinBits,
+				CheerColor:  tier.Color,
+				ImageURL:    tier.Images["dark"]["animated"]["1"],
+			}
+
+			cheermoteInfo[currentTier.CheerID] = currentTier
+
+			if lastTier.CheerID != "" {
+				lastTier.NextTierID = currentTier.CheerID
+				cheermoteInfo[lastTier.CheerID] = lastTier
+			}
+
+			lastTier = currentTier
+		}
+	}
+
+	return
+}
+
+func (h *HelixAPI) GetCheermotesFor(username string) (cheermotePrefixes []string, cheermotesInfo map[string]HelixCheermote, err error) {
+	bcid, err := h.GetUserID(username)
+	if err != nil {
+		return
+	}
+
+	return h.GetCheermotes(bcid)
+}
+
 func (h *HelixAPI) GetGlobalChatBadges() (badges map[string]HelixChatBadge, err error) {
-	resp, err := h.Get("https://api.twitch.tv/helix/chat/badges/global")
+	resp, err := h.getEnsureOK("https://api.twitch.tv/helix/chat/badges/global")
 	if err != nil {
 		return
 	}
@@ -67,7 +147,7 @@ func (h *HelixAPI) GetGlobalChatBadges() (badges map[string]HelixChatBadge, err 
 }
 
 func (h *HelixAPI) GetChannelChatBadges(bcid string) (badges map[string]HelixChatBadge, err error) {
-	resp, err := h.Get("https://api.twitch.tv/helix/chat/badges?broadcaster_id=" + bcid)
+	resp, err := h.getEnsureOK("https://api.twitch.tv/helix/chat/badges?broadcaster_id=" + bcid)
 	if err != nil {
 		return
 	}
@@ -123,6 +203,15 @@ func findHelixChatBadges(rbody io.ReadCloser) (badges map[string]HelixChatBadge,
 
 			badges[badge.SetID+"/"+version["id"]] = helixBadge
 		}
+	}
+
+	return
+}
+
+func (h *HelixAPI) getEnsureOK(url string) (resp *http.Response, err error) {
+	resp, err = h.Get(url)
+	if err == nil && resp.StatusCode != http.StatusOK {
+		err = httpStatusError{resp}
 	}
 
 	return

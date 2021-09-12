@@ -1,10 +1,17 @@
 package retwitch
 
+import (
+	"regexp"
+	"strings"
+)
+
 type ChannelInfo struct {
-	Client *Client
-	Name   string
-	id     string
-	badges map[string]HelixChatBadge
+	Client     *Client
+	Name       string
+	id         string
+	cheerMatch *regexp.Regexp
+	cheerInfo  map[string]HelixCheermote
+	badges     map[string]HelixChatBadge
 }
 
 func (c *Client) GetChannel(name string) (ch *ChannelInfo, err error) {
@@ -29,6 +36,44 @@ func (c *Client) GetChannel(name string) (ch *ChannelInfo, err error) {
 	}
 
 	c.channels[name] = ch
+	return
+}
+
+func (c *ChannelInfo) resolveCheermotes() (err error) {
+	if c.cheerInfo != nil {
+		return nil
+	}
+
+	helix, err := c.Client.Helix()
+	if err != nil {
+		return
+	}
+
+	prefixes, infos, err := helix.GetCheermotes(c.id)
+	if err != nil {
+		return
+	}
+
+	cmPattern, err := regexp.Compile("\\b(" + strings.Join(prefixes, "|") + ")([0-9]+)\\b")
+	if err != nil {
+		return
+	}
+
+	c.cheerMatch = cmPattern
+	c.cheerInfo = infos
+	return
+}
+
+func (c *ChannelInfo) GetEmoteURL(emoteID string) (emoteURL string, err error) {
+	if c.cheerInfo != nil {
+		if cminfo, iscm := c.cheerInfo[emoteID]; iscm {
+			emoteURL = cminfo.ImageURL
+			return
+		}
+	}
+
+	emoteURL = "https://static-cdn.jtvnw.net/emoticons/v2/" +
+		emoteID + "/default/dark/1.0"
 	return
 }
 
@@ -64,11 +109,5 @@ func (c *ChannelInfo) GetBadgeURL(badgeID string) (badgeURL string, err error) {
 	}
 
 	err = ErrNoSuchBadge
-	return
-}
-
-func (c *ChannelInfo) GetEmoteURL(emoteID string) (emoteURL string, err error) {
-	emoteURL = "https://static-cdn.jtvnw.net/emoticons/v2/" +
-		emoteID + "/default/dark/1.0"
 	return
 }

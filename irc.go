@@ -47,13 +47,13 @@ func ircConnect(username string, authcode string) (*girc.Client, error) {
 	return irc, nil
 }
 
-func ircToLiveEvent(ircEvent girc.Event) (event LiveEvent) {
+func ircToLiveEvent(ch *ChannelInfo, ircEvent girc.Event) (event LiveEvent) {
 	event = LiveEvent{
 		Time:    ircEvent.Timestamp,
 		Channel: ircEvent.Params[0][1:],
 		Sender:  ircToSender(ircEvent),
 		Kind:    MessageEvent,
-		Message: ircToMessage(ircEvent),
+		Message: ircToMessage(ch, ircEvent),
 	}
 
 	if msgid, hasid := ircEvent.Tags.Get("id"); hasid {
@@ -89,7 +89,7 @@ func ircToSender(ircEvent girc.Event) (sender Viewer) {
 	return
 }
 
-func ircToMessage(ircEvent girc.Event) (message Text) {
+func ircToMessage(ch *ChannelInfo, ircEvent girc.Event) (message Text) {
 	msg := ircEvent.Last()
 	if ok, ctcp := ircEvent.IsCTCP(); ok {
 		msg = ctcp.Text
@@ -97,7 +97,7 @@ func ircToMessage(ircEvent girc.Event) (message Text) {
 
 	var err error
 	emotespec, _ := ircEvent.Tags.Get("emotes")
-	message, err = parseIRCText(msg, emotespec)
+	message, err = ch.parseIRCText(msg, emotespec)
 	if err != nil {
 		message = Text{{Text: msg}}
 	}
@@ -107,7 +107,12 @@ func ircToMessage(ircEvent girc.Event) (message Text) {
 
 func (c *Client) onPrivmsg(ircClient *girc.Client, event girc.Event) {
 	if event.Params[0][0] == '#' {
-		c.levs <- ircToLiveEvent(event)
+		ch, err := c.GetChannel(event.Params[0][1:])
+		if err != nil {
+			ch = nil
+		}
+
+		c.levs <- ircToLiveEvent(ch, event)
 	}
 }
 
