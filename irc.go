@@ -82,7 +82,7 @@ func ircToSender(ircEvent girc.Event) (sender Viewer) {
 		sender.Color = color
 	}
 
-	if badgespec, ok := ircEvent.Tags.Get("badges"); ok {
+	if badgespec, ok := ircEvent.Tags.Get("badges"); ok && badgespec != "" {
 		sender.Badges = strings.Split(badgespec, ",")
 	}
 
