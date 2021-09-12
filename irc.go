@@ -17,8 +17,8 @@ func ircConnect(username string, authcode string) (*girc.Client, error) {
 
 	irc := girc.New(girc.Config{
 		Server:     "irc.chat.twitch.tv",
-		Port:       6667,
-		SSL:        false,
+		Port:       6697,
+		SSL:        true,
 		ServerPass: authcode,
 		Nick:       username,
 		User:       username,
@@ -54,6 +54,10 @@ func ircToLiveEvent(ircEvent girc.Event) (event LiveEvent) {
 		Sender:  ircToSender(ircEvent),
 		Kind:    MessageEvent,
 		Message: ircToMessage(ircEvent),
+	}
+
+	if msgid, hasid := ircEvent.Tags.Get("id"); hasid {
+		event.MessageID = msgid
 	}
 
 	if ircEvent.IsAction() {

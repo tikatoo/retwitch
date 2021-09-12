@@ -23,11 +23,12 @@ type Viewer struct {
 }
 
 type LiveEvent struct {
-	Time    time.Time     `json:"time"`
-	Channel string        `json:"channel"`
-	Sender  Viewer        `json:"sender"`
-	Kind    LiveEventKind `json:"kind"`
-	Message Text          `json:"message"`
+	MessageID string        `json:"id,omitempty"`
+	Time      time.Time     `json:"time"`
+	Channel   string        `json:"channel"`
+	Sender    Viewer        `json:"sender"`
+	Kind      LiveEventKind `json:"kind"`
+	Message   Text          `json:"message"`
 }
 
 func (v *Viewer) String() string {

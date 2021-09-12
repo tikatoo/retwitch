@@ -66,3 +66,9 @@ func (c *ChannelInfo) GetBadgeURL(badgeID string) (badgeURL string, err error) {
 	err = ErrNoSuchBadge
 	return
 }
+
+func (c *ChannelInfo) GetEmoteURL(emoteID string) (emoteURL string, err error) {
+	emoteURL = "https://static-cdn.jtvnw.net/emoticons/v2/" +
+		emoteID + "/default/dark/1.0"
+	return
+}

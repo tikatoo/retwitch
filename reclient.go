@@ -9,7 +9,7 @@ type Client struct {
 	helix    *HelixAPI
 	irc      *girc.Client
 	levs     chan LiveEvent
-	channels map[string]*ChannelInfo
+	channels map[string]*ChannelInfo // TODO: Memory leak
 	badges   map[string]HelixChatBadge
 }
 

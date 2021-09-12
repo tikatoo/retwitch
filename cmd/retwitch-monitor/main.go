@@ -60,9 +60,27 @@ func printURLs(client *retwitch.Client, event retwitch.LiveEvent) {
 	for _, badgeID := range event.Sender.Badges {
 		badgeURL, err := channel.GetBadgeURL(badgeID)
 		if err != nil {
-			fmt.Printf("    %s error: %s\n", badgeID, err)
+			fmt.Printf("    badge %s error: %s\n", badgeID, err)
 		} else {
-			fmt.Printf("    %s: %q\n", badgeID, badgeURL)
+			fmt.Printf("    badge %s: %q\n", badgeID, badgeURL)
+		}
+	}
+
+	showedURLFor := map[string]struct{}{}
+
+	for _, segment := range event.Message {
+		if segment.EmoteID == "" {
+			continue
+		}
+
+		if _, exists := showedURLFor[segment.EmoteID]; !exists {
+			showedURLFor[segment.EmoteID] = struct{}{}
+			emoteURL, err := channel.GetEmoteURL(segment.EmoteID)
+			if err != nil {
+				fmt.Printf("    emote %s error: %s\n", segment.EmoteText, err)
+			} else {
+				fmt.Printf("    emote %s: %q\n", segment.EmoteText, emoteURL)
+			}
 		}
 	}
 }
